@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishScan — URL Red-Flag Analyzer</title>
+<style>
+  :root{
+    --bg:#0b0f10;
+    --panel:#11171a;
+    --line:#1f2b2e;
+    --text:#d9e6e6;
+    --dim:#7c9494;
+    --accent:#3ee6b0;
+    --danger:#ff5d5d;
+    --warn:#ffb84d;
+    --safe:#3ee6b0;
+    --mono: 'Courier New', Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:radial-gradient(ellipse at top, #101817 0%, #0b0f10 60%);
+    color:var(--text);
+    font-family:var(--mono);
+    min-height:100vh;
+    padding:40px 16px 80px;
+  }
+  .wrap{max-width:760px;margin:0 auto;}
+  header{margin-bottom:28px;}
+  .tag{
+    color:var(--accent);
+    font-size:12px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    border-left:2px solid var(--accent);
+    padding-left:10px;
+  }
+  h1{
+    font-size:32px;
+    margin:14px 0 6px;
+    color:var(--text);
+    letter-spacing:-0.5px;
+  }
+  h1 span{color:var(--accent);}
+  .sub{color:var(--dim);font-size:14px;line-height:1.6;max-width:560px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:22px;
+    margin-top:26px;
+  }
+  label{display:block;font-size:12px;color:var(--dim);margin-bottom:8px;letter-spacing:1px;}
+  .input-row{display:flex;gap:10px;}
+  input[type=text]{
+    flex:1;
+    background:#0d1314;
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:12px 14px;
+    font-family:var(--mono);
+    font-size:14px;
+    border-radius:4px;
+    outline:none;
+  }
+  input[type=text]:focus{border-color:var(--accent);}
+  button{
+    background:var(--accent);
+    color:#04120d;
+    border:none;
+    padding:0 22px;
+    font-family:var(--mono);
+    font-weight:bold;
+    letter-spacing:1px;
+    border-radius:4px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  button:hover{filter:brightness(1.1);}
+  button:active{transform:translateY(1px);}
+
+  .result{margin-top:24px;display:none;}
+  .score-row{display:flex;align-items:center;gap:16px;margin-bottom:18px;}
+  .score-badge{
+    font-size:34px;font-weight:bold;
+    padding:6px 18px;border-radius:6px;border:1px solid var(--line);
+  }
+  .verdict{font-size:13px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+
+  .check{
+    display:flex;justify-content:space-between;gap:12px;
+    padding:10px 0;border-top:1px solid var(--line);
+    font-size:13px;
+  }
+  .check:first-of-type{border-top:none;}
+  .check .name{color:var(--text);}
+  .check .status{white-space:nowrap;font-weight:bold;}
+  .pass{color:var(--safe);}
+  .fail{color:var(--danger);}
+  .flagwarn{color:var(--warn);}
+
+  footer{margin-top:40px;color:var(--dim);font-size:11px;line-height:1.8;border-top:1px solid var(--line);padding-top:18px;}
+  footer a{color:var(--accent);text-decoration:none;}
+  .example{color:var(--dim);font-size:11px;margin-top:10px;}
+  .example button.chip{
+    background:transparent;border:1px solid var(--line);color:var(--dim);
+    padding:4px 10px;font-size:11px;border-radius:20px;margin-right:6px;margin-top:6px;cursor:pointer;
+  }
+  .example button.chip:hover{border-color:var(--accent);color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="tag">Client-side · No data leaves your browser</div>
+    <h1>Phish<span>Scan</span></h1>
+    <p class="sub">Paste any URL and get an instant heuristic breakdown of common phishing red flags — IP-based hosts, lookalike characters, suspicious TLDs, excessive subdomains, and more. Runs entirely in JavaScript, no server, no logging.</p>
+  </header>
+
+  <div class="panel">
+    <label for="urlInput">TARGET URL</label>
+    <div class="input-row">
+      <input type="text" id="urlInput" placeholder="e.g. http://paypa1-secure-login.verify-account.xyz/login" autocomplete="off">
+      <button onclick="scan()">SCAN</button>
+    </div>
+    <div class="example">
+      TRY:
+      <button class="chip" onclick="fill('http://192.168.1.5@accounts-secure-login.com/verify')">IP + @ trick</button>
+      <button class="chip" onclick="fill('https://www.google.com')">Legit example</button>
+      <button class="chip" onclick="fill('https://secure-paypa1-verification.account-update.tk')">Fake TLD</button>
+    </div>
+
+    <div class="result" id="result">
+      <div class="score-row">
+        <div class="score-badge" id="scoreBadge">0</div>
+        <div>
+          <div class="verdict" id="verdictText">—</div>
+        </div>
+      </div>
+      <div id="checks"></div>
+    </div>
+  </div>
+
+  <footer>
+    Built by Nihara Dewindini · Cyber Security Undergraduate, SLIIT<br>
+    Heuristic tool for educational / awareness purposes — not a substitute for a full threat-intel lookup.<br>
+    <a href="https://github.com/" target="_blank">View source on GitHub</a>
+  </footer>
+</div>
+
+<script>
+function fill(val){
+  document.getElementById('urlInput').value = val;
+  scan();
+}
+
+const SUSPICIOUS_TLDS = ['.tk','.ml','.ga','.cf','.gq','.xyz','.top','.work','.click','.link','.support'];
+const SHORTENERS = ['bit.ly','tinyurl.com','t.co','goo.gl','ow.ly','is.gd','buff.ly'];
+const BRANDS = ['paypal','google','microsoft','apple','amazon','netflix','facebook','instagram','bankofamerica','chase','wellsfargo','binance','coinbase'];
+
+function scan(){
+  const raw = document.getElementById('urlInput').value.trim();
+  if(!raw){ return; }
+  let checks = [];
+  let score = 0; // higher = more suspicious
+
+  let hostname = '';
+  let parsed = null;
+  try{
+    parsed = new URL(raw.match(/^https?:\/\//i) ? raw : 'http://' + raw);
+    hostname = parsed.hostname;
+  }catch(e){
+    hostname = raw;
+  }
+
+  // 1. Uses HTTPS
+  const isHttps = raw.toLowerCase().startsWith('https://');
+  checks.push({name:'Uses HTTPS', pass: isHttps, weight: isHttps?0:1});
+
+  // 2. IP address as hostname
+  const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+  checks.push({name:'Hostname is not a raw IP address', pass: !isIP, weight: isIP?3:0});
+
+  // 3. '@' symbol trick
+  const hasAt = raw.includes('@');
+  checks.push({name:"No '@' redirect trick in URL", pass: !hasAt, weight: hasAt?3:0});
+
+  // 4. Excessive subdomains
+  const subCount = hostname.split('.').length;
+  const tooManySubs = subCount > 4;
+  checks.push({name:'Reasonable number of subdomains', pass: !tooManySubs, weight: tooManySubs?2:0});
+
+  // 5. Suspicious TLD
+  const suspiciousTld = SUSPICIOUS_TLDS.some(t => hostname.toLowerCase().endsWith(t));
+  checks.push({name:'Not a commonly-abused free TLD', pass: !suspiciousTld, weight: suspiciousTld?2:0});
+
+  // 6. URL shortener
+  const isShortener = SHORTENERS.some(s => hostname.toLowerCase().includes(s));
+  checks.push({name:'Not a known URL shortener', pass: !isShortener, weight: isShortener?1:0});
+
+  // 7. Excessive length
+  const tooLong = raw.length > 90;
+  checks.push({name:'URL length looks normal (< 90 chars)', pass: !tooLong, weight: tooLong?1:0});
+
+  // 8. Excessive hyphens (common in fake domains)
+  const hyphenCount = (hostname.match(/-/g) || []).length;
+  const tooManyHyphens = hyphenCount >= 3;
+  checks.push({name:'Not an unusually hyphenated domain', pass: !tooManyHyphens, weight: tooManyHyphens?2:0});
+
+  // 9. Punycode / homograph indicator
+  const isPunycode = hostname.includes('xn--');
+  checks.push({name:'No punycode (possible homograph attack)', pass: !isPunycode, weight: isPunycode?3:0});
+
+  // 10. Brand name mimicry outside the actual domain
+  const lowerHost = hostname.toLowerCase();
+  const brandMatch = BRANDS.find(b => lowerHost.includes(b));
+  const looksLikeRealBrand = brandMatch && (lowerHost === brandMatch + '.com' || lowerHost.endsWith('.' + brandMatch + '.com'));
+  const brandMimicry = brandMatch && !looksLikeRealBrand;
+  checks.push({name:'No brand name used outside its real domain', pass: !brandMimicry, weight: brandMimicry?3:0});
+
+  score = checks.reduce((s,c)=>s+c.weight,0);
+  const maxScore = 21;
+  const pct = Math.min(100, Math.round((score/maxScore)*100));
+
+  let verdict, color;
+  if(pct >= 50){ verdict = 'HIGH RISK — multiple phishing indicators'; color='var(--danger)'; }
+  else if(pct >= 20){ verdict = 'CAUTION — some suspicious signals'; color='var(--warn)'; }
+  else { verdict = 'LOW RISK — no major red flags detected'; color='var(--safe)'; }
+
+  document.getElementById('result').style.display = 'block';
+  const badge = document.getElementById('scoreBadge');
+  badge.textContent = pct + '%';
+  badge.style.color = color;
+  badge.style.borderColor = color;
+  const vt = document.getElementById('verdictText');
+  vt.textContent = verdict;
+  vt.style.color = color;
+
+  const checksHtml = checks.map(c => {
+    const statusClass = c.pass ? 'pass' : (c.weight >= 3 ? 'fail' : 'flagwarn');
+    const statusText = c.pass ? 'OK' : 'FLAG';
+    return `<div class="check"><div class="name">${c.name}</div><div class="status ${statusClass}">${statusText}</div></div>`;
+  }).join('');
+  document.getElementById('checks').innerHTML = checksHtml;
+}
+
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') scan();
+});
+</script>
+</body>
+</html>
