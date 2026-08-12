@@ -2,7 +2,7 @@
 
 A lightweight, fully client-side tool that scans any URL for common phishing red flags — IP-based hosts, `@` redirect tricks, punycode/homograph attacks, brand-name mimicry, suspicious TLDs, and more. No backend, no data collection — everything runs in the browser.
 
-🔗 **Live demo:** _(add your GitHub Pages link here once deployed)_
+🔗 **Live demo:** https://nihara-dev.github.io/phishscan/
 
 ## Why I built this
 As part of my cyber security coursework and web application security assessments, I kept manually checking suspicious URLs against the same checklist of red flags. PhishScan automates that first-pass triage into a simple, instant tool — the kind of quick heuristic check a SOC analyst or end user could run before clicking a link.
